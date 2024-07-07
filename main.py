@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import sys
+import csv
 if os.getenv('API_ENV') != 'production':
     from dotenv import load_dotenv
 
@@ -10,13 +11,22 @@ if os.getenv('API_ENV') != 'production':
 
 from fastapi import FastAPI, HTTPException, Request
 from datetime import datetime
+from linebot.models import (
+    TextSendMessage,
+    QuickReply,
+    QuickReplyButton,
+    MessageAction
+)
 from linebot.v3.webhook import WebhookParser
 from linebot.v3.messaging import (
     AsyncApiClient,
     AsyncMessagingApi,
     Configuration,
     ReplyMessageRequest,
-    TextMessage)
+    TextMessage,
+    URIAction,
+    ShowLoadingAnimationRequest
+    )
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
@@ -59,7 +69,6 @@ from utils import check_image_quake, check_location_in_message, get_current_weat
 firebase_url = os.getenv('FIREBASE_URL')
 gemini_key = os.getenv('GEMINI_API_KEY')
 
-
 # Initialize the Gemini Pro API
 genai.configure(api_key=gemini_key)
 
@@ -81,6 +90,8 @@ async def handle_callback(request: Request):
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
+
+    story_part = "這是一個關於勇者的故事。一天，勇者來到了一個岔路口，左邊是通往寶藏的道路，但充滿了危險；右邊是通往村莊的道路，能夠安全回家。你會怎麼選擇？"
 
     for event in events:
         logging.info(event)
@@ -107,73 +118,70 @@ async def handle_callback(request: Request):
             else:
                 messages = chatgpt
 
-            bot_condition = {
-                "清空": 'A',
-                "摘要": 'B',
-                "地震": 'C',
-                "氣候": 'D',
-                "其他": 'E'
-            }
+            print('='*10)
+            print(text)
 
             model = genai.GenerativeModel('gemini-1.5-pro')
-            response = model.generate_content(
-                f'請判斷 {text} 裡面的文字屬於 {bot_condition} 裡面的哪一項？符合條件請回傳對應的英文文字就好，不要有其他的文字與字元。')
-            print('='*10)
-            text_condition = re.sub(r'[^A-Za-z]', '', response.text)
-            print(text_condition)
-            print('='*10)
-            if text_condition == 'A':
-                fdb.delete(user_chat_path, None)
-                reply_msg = '已清空對話紀錄'
-            elif text_condition == 'B':
-                model = genai.GenerativeModel('gemini-pro')
+
+            if text=="選單":
+                reply_msg = TextSendMessage( 
+                            text="Hello. How can I help you?",
+                            quick_reply= QuickReply(
+                                items=[
+                                    QuickReplyButton(
+                                        action=URIAction(label="情緒日記",uri="https://liff.line.me/2005781692-mkwZ19g6") ),
+                                    QuickReplyButton(
+                                        action=MessageAction(label="每日精選",text="每日精選") ),
+                                    ]
+                            )
+                        )
+                simple_msg = TextSendMessage(text="Hello, this is a test message")
+                line_bot_api.push_message(user_id,[simple_msg])  
+            elif text=="每日精選":
                 response = model.generate_content(
-                    f'Summary the following message in Traditional Chinese by less 5 list points. \n{messages}')
+                    f"請幫我推薦一本書就好，只要書名以及介紹文字（文字即可）"
+                )
                 reply_msg = response.text
-            elif text_condition == 'C':
-                print('='*10)
-                print("地震相關訊息")
-                print('='*10)
-                model = genai.GenerativeModel('gemini-pro-vision')
-                OPEN_API_KEY = os.getenv('OPEN_API_KEY')
-                earth_res = requests.get(f'https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/E-A0015-003?Authorization={OPEN_API_KEY}&downloadType=WEB&format=JSON')
-                url = earth_res.json()["cwaopendata"]["Dataset"]["Resource"]["ProductURL"]
-                reply_msg = check_image_quake(url)+f'\n\n{url}'
-            elif text_condition == 'D':
-                location_text = '台北市'
-                location = check_location_in_message(location_text)
-                print('Location is: ' + location)
-                weather_data = get_weather_data(location)
-                simplified_data = simplify_data(weather_data)
-                current_weather = get_current_weather(simplified_data)
-
-                print('The Data is: ' + str(current_weather))
-
-                now = datetime.now()
-                formatted_time = now.strftime("%Y/%m/%d %H:%M:%S")
-
-                if current_weather is not None:
-                    total_info = f'位置: {location}\n氣候: {current_weather["Wx"]}\n降雨機率: {current_weather["PoP"]}\n體感: {current_weather["CI"]}\n現在時間: {formatted_time}'
-
-                response = model.generate_content(
-                    f'你現在身處在台灣，相關資訊 {total_info}，我朋友說了「{text}」，請問是否有誇張、假裝的嫌疑？ 回答是或否。')
-                reply_msg = response.text
+            elif text=="故事分享":
+                reply_msg = story_part
             else:
+                
+                response = model.generate_content(
+                    f"以下是用戶的回覆：'{text}'。請判斷這是正面還是負面的回覆。只需回答 positive 或 negative."
+                )
+                print('='*10)
+                sentiment = re.sub(r'[^A-Za-z]', '', response.text)
+                sentiment = sentiment.lower()
+                print(sentiment)
+                if sentiment == "positive":
+                    response = model.generate_content(
+                        f"以下是用戶的回覆：'{text}'。"
+                    )
+                    reply_msg = response.text
+                elif sentiment == "negative":
+                    response = model.generate_content(
+                        f"以下是用戶的回覆：'{text}'。請將句中負面、有爭議的詞彙替換成較委婉的詞彙。"
+                    )
+                    reply_msg = response.text
+                else:
+                    reply_msg = "無法判斷你的回覆。"
+
                 # model = genai.GenerativeModel('gemini-pro')
-                messages.append({'role': 'user', 'parts': [text]})
-                response = model.generate_content(messages)
-                messages.append({'role': 'model', 'parts': [text]})
-                # 更新firebase中的對話紀錄
-                fdb.put_async(user_chat_path, None, messages)
-                reply_msg = response.text
+                # messages.append({'role': 'user', 'parts': [text]})
+                # response = model.generate_content(messages)
+                # messages.append({'role': 'model', 'parts': [text]})
+                # # 更新firebase中的對話紀錄
+                # fdb.put_async(user_chat_path, None, messages)
+                # reply_msg = response.text
+
+            # line_bot_api.show_loading_animation(ShowLoadingAnimationRequest(chatId=event.source.user_id, loadingSeconds=5))
 
             await line_bot_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply_msg)]
-                ))
-
-    return 'OK'
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages= TextMessage(text=reply_msg)
+                    ))    
+            return 'OK'
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', default=8080))
