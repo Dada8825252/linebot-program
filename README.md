@@ -8,7 +8,8 @@ This project is a FastAPI application that integrates with LINE Messaging API, G
 - **LINE Webhook Handler**: Handles incoming messages from LINE and responds accordingly.
 - **Gemini AI Integration**: Uses Gemini AI to process and generate responses based on the content of the messages.
 - **Firebase Integration**: Stores and retrieves chat history from Firebase.
-
+- **Web Page**: https://github.com/Celinelinlin/celinelinlin.github.io
+  
 ## Prerequisites
 
 - Python 3.7+
