@@ -2,13 +2,16 @@
 
 This project is a FastAPI application that integrates with LINE Messaging API, Gemini AI, and Firebase to handle various types of messages and provide intelligent responses.
 
+Our purpose is to develop a line bot to take care of our emotion. 
+Users can record their daily emotions through the mood diary we provide.
+
 ## Features
 
 - **Health Check Endpoint**: Simple endpoint to check if the service is running.
 - **LINE Webhook Handler**: Handles incoming messages from LINE and responds accordingly.
 - **Gemini AI Integration**: Uses Gemini AI to process and generate responses based on the content of the messages.
 - **Firebase Integration**: Stores and retrieves chat history from Firebase.
-- **Web Page**: https://github.com/Celinelinlin/celinelinlin.github.io
+- **Mood Diary HTML**: https://github.com/Celinelinlin/celinelinlin.github.io
   
 ## Prerequisites
 
