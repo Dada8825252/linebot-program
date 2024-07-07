@@ -19,7 +19,8 @@ from linebot.v3.messaging import (
     TextMessage,
     QuickReply,
     QuickReplyItem,
-    MessageAction,)
+    MessageAction,
+    URIAction)
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
@@ -115,11 +116,11 @@ async def handle_callback(request: Request):
                 messages = chatgpt
 
             bot_condition = {
-                "開啟選單": 'A',
+                "功能選單": 'A',
                 "每日推薦書籍": 'B',
                 "故事分享": 'C',
                 "故事後續":'D',
-                "溝通": 'E',
+                "非暴力溝通": 'E',
                 "聊天": 'F'
             }
 
@@ -130,26 +131,38 @@ async def handle_callback(request: Request):
             text_condition = re.sub(r'[^A-Za-z]', '', response.text)
             print(text_condition)
             print('='*10)
-            if text_condition == 'A':
+            if text == "功能選單":
                 reply_msg = TextMessage(
-                            text=text,
+                            text="我能怎麼幫您呢？",
                             quick_reply=QuickReply(items=[
                                 QuickReplyItem(
-                                    action=MessageAction(label="入口", text="入口")
-                                )]
+                                        action=URIAction(label="情緒日記",uri="https://liff.line.me/2005781692-mkwZ19g6") ),
+                                QuickReplyItem(
+                                        action=URIAction(label="認識情緒",uri="https://liff.line.me/2005781692-JVRmrwoZ") ),
+                                QuickReplyItem(
+                                    action=MessageAction(label="每日精選書籍",text="每日推薦書籍")),
+                                QuickReplyItem(
+                                    action=MessageAction(label="故事分享",text="故事分享")),
+                                QuickReplyItem(
+                                    action=MessageAction(label="非暴力溝通",text="非暴力溝通")),
+                                ]
                             ),
                         )
+
             elif text_condition == 'B':
                 mood = f.read()
                 response = model.generate_content(
                     f'請幫我推薦一本書就好，符合我今天的心情：{mood}，只要書名以及介紹文字，請不要回傳特殊符號')
-                reply_msg = response.text
+                reply_msg = TextMessage(text=response.text)
             elif text_condition == 'C':
                 reply_msg = story_start+"\n如果你是蘇珊你會怎麼做呢？"
+                reply_msg = TextMessage(text=reply_msg)
             elif text_condition == 'D':    
                 reply_msg = story_end
+                reply_msg = TextMessage(text=reply_msg)
             elif text_condition == 'E':
                 reply_msg = "非暴力溝通\n1. 發生什麼事了？跟我分享可以嗎？\n2. 跟我說說你的感受\n3. 提出請求，怎麼樣能夠真正幫助你呢？"
+                reply_msg = TextMessage(text=reply_msg)
             elif text_condition == 'F':
                 response = model.generate_content(
                     f"以下是用戶的回覆：'{text}'。請判斷這是正面還是負面的回覆。只需回答 positive 或 negative."
@@ -162,14 +175,14 @@ async def handle_callback(request: Request):
                     response = model.generate_content(
                         f"以下是用戶的回覆：'{text}'。"
                     )
-                    reply_msg = response.text
+                    reply_msg = TextMessage(text=response.text)
                 elif sentiment == "negative":
                     response = model.generate_content(
                         f"以下是用戶的回覆：'{text}'。請將句中負面、有爭議的詞彙替換成較委婉的詞彙。"
                     )
-                    reply_msg = response.text
+                    reply_msg = TextMessage(text=response.text)
                 else:
-                    reply_msg = "無法判斷你的回覆。"
+                    reply_msg = TextMessage(text="無法判斷你的回覆。")
             else:
                 # model = genai.GenerativeModel('gemini-pro')
                 messages.append({'role': 'user', 'parts': [text]})
@@ -177,12 +190,12 @@ async def handle_callback(request: Request):
                 messages.append({'role': 'model', 'parts': [text]})
                 # 更新firebase中的對話紀錄
                 fdb.put_async(user_chat_path, None, messages)
-                reply_msg = response.text
+                reply_msg = TextMessage(text=response.text)
 
             await line_bot_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply_msg)]
+                    messages=[reply_msg]
                 ))
     f.close()
     return 'OK'
