@@ -1,9 +1,12 @@
-# FastAPI LINE Bot with Gemini AI and Firebase Integration
+# 情緒小管家
+## FastAPI LINE Bot with Gemini AI and Firebase Integration
 
 This project is a FastAPI application that integrates with LINE Messaging API, Gemini AI, and Firebase to handle various types of messages and provide intelligent responses.
 
 Our purpose is to develop a line bot to take care of our emotion. 
 Users can record their daily emotions through the mood diary we provide.
+More information: https://www.canva.com/design/DAGKOx1JxqQ/TYKOf6XbZlJaWx0x4J4LDg/view?utm_content=DAGKOx1JxqQ&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h3c581fbcd7
+
 
 ## Features
 
